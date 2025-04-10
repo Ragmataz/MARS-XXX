@@ -241,6 +241,10 @@ def check_crossovers():
         '1mo': {'label': 'MONTHLY', 'lookback_days': 90, 'display_days': 24}   # Extended from 30 to 90
     }
     
+    # Updated emoji definitions that are widely supported
+    BUY_EMOJI = "🍏"  # Green apple (universally supported)
+    SELL_EMOJI = "🔴"  # Red circle
+    
     logger.info(f"Running scan at {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Load NSE500 stocks
@@ -338,15 +342,15 @@ def check_crossovers():
                     timeframe_label = settings['label']
                     
                     if recent_crossover_up:
-                        # BUY signal with green button emoji
+                        # BUY signal with green emoji
                         crossover_type = "BUY"
-                        emoji_prefix = "🟢"  # Green button
+                        emoji_prefix = BUY_EMOJI
                         category = f"{timeframe_label}_BUY"
                         alert_counts[category] += 1
                     else:
-                        # SELL signal with red button emoji
+                        # SELL signal with red emoji
                         crossover_type = "SELL"
-                        emoji_prefix = "🔴"  # Red button
+                        emoji_prefix = SELL_EMOJI
                         category = f"{timeframe_label}_SELL"
                         alert_counts[category] += 1
                     
@@ -388,13 +392,13 @@ def check_crossovers():
     summary = f"🔍 *MARS Scan Complete*\n\n"
     summary += f"Processed {stocks_processed} stocks, {stocks_with_data} had valid data\n\n"
     summary += "📊 *BUY Signals:*\n"
-    summary += f"🟢 DAILY: {alert_counts['DAILY_BUY']}\n"
-    summary += f"🟢 WEEKLY: {alert_counts['WEEKLY_BUY']}\n"
-    summary += f"🟢 MONTHLY: {alert_counts['MONTHLY_BUY']}\n\n"
+    summary += f"{BUY_EMOJI} DAILY: {alert_counts['DAILY_BUY']}\n"
+    summary += f"{BUY_EMOJI} WEEKLY: {alert_counts['WEEKLY_BUY']}\n"
+    summary += f"{BUY_EMOJI} MONTHLY: {alert_counts['MONTHLY_BUY']}\n\n"
     summary += "📊 *SELL Signals:*\n"
-    summary += f"🔴 DAILY: {alert_counts['DAILY_SELL']}\n"
-    summary += f"🔴 WEEKLY: {alert_counts['WEEKLY_SELL']}\n"
-    summary += f"🔴 MONTHLY: {alert_counts['MONTHLY_SELL']}\n\n"
+    summary += f"{SELL_EMOJI} DAILY: {alert_counts['DAILY_SELL']}\n"
+    summary += f"{SELL_EMOJI} WEEKLY: {alert_counts['WEEKLY_SELL']}\n"
+    summary += f"{SELL_EMOJI} MONTHLY: {alert_counts['MONTHLY_SELL']}\n\n"
     summary += f"Total: {alerts_sent} alerts among {len(stock_list)} stocks"
     
     # Send status message only if we found no alerts at all
