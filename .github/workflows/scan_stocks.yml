@@ -1,0 +1,31 @@
+name: MARS-CROSSOVER
+
+on:
+  schedule:
+    # Run at 10:00 AM and 3:00 PM IST on weekdays (4:30 AM and 9:30 AM UTC)
+    - cron: '30 4,9 * * 1-5'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  scan_stocks:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run MARS crossover scan
+      env:
+        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: python main.py
