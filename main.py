@@ -10,7 +10,7 @@ import os
 import logging
 import requests
 
-# Setup logging
+# Setup logging with more detail
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -92,10 +92,12 @@ def load_nse500_stocks():
     """Load NSE500 stocks from CSV file."""
     try:
         df = pd.read_csv('nse500_stocks.csv')
+        logger.info(f"Loaded {len(df)} stocks from CSV file")
         return [f"{stock}.NS" for stock in df['Symbol'].tolist()]
     except Exception as e:
         logger.error(f"Error loading NSE500 stocks: {str(e)}")
         # Fallback to a small list of stocks
+        logger.info("Using fallback stock list")
         return ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS']
 
 def calculate_ma(data, length, ma_type='EMA'):
@@ -128,11 +130,19 @@ def calculate_mars(stock_symbol, index_symbol, ma_length, ma_type, timeframe='1d
         end_date = datetime.now()
         start_date = end_date - timedelta(days=lookback_days+ma_length*2)  # Extra days for MA calculation
         
+        logger.info(f"Fetching {timeframe} data for {stock_symbol} from {start_date} to {end_date}")
         stock_data = yf.download(stock_symbol, start=start_date, end=end_date, interval=interval, progress=False)
         index_data = yf.download(index_symbol, start=start_date, end=end_date, interval=interval, progress=False)
         
-        if stock_data.empty or index_data.empty:
+        if stock_data.empty:
+            logger.warning(f"No stock data retrieved for {stock_symbol} on {timeframe}")
             return None
+            
+        if index_data.empty:
+            logger.warning(f"No index data retrieved for {index_symbol} on {timeframe}")
+            return None
+            
+        logger.info(f"Retrieved {len(stock_data)} data points for {stock_symbol} on {timeframe}")
         
         # Calculate MAs
         stock_ma = calculate_ma(stock_data['Close'], ma_length, ma_type)
@@ -150,6 +160,10 @@ def calculate_mars(stock_symbol, index_symbol, ma_length, ma_type, timeframe='1d
         crossover_up = (previous_mars < 0) & (mars_value > 0)
         crossover_down = (previous_mars > 0) & (mars_value < 0)
         
+        # Log the latest MARS value
+        latest_mars = mars_value.iloc[-1] if not mars_value.empty else None
+        logger.info(f"{stock_symbol} {timeframe} latest MARS value: {latest_mars}")
+        
         return {
             'stock_data': stock_data,
             'index_data': index_data,
@@ -158,7 +172,7 @@ def calculate_mars(stock_symbol, index_symbol, ma_length, ma_type, timeframe='1d
             'crossover_down': crossover_down,
             'stock_ma': stock_ma,
             'index_ma': index_ma,
-            'latest_mars': mars_value.iloc[-1] if not mars_value.empty else None
+            'latest_mars': latest_mars
         }
     except Exception as e:
         logger.error(f"Error calculating MARS for {stock_symbol} on {timeframe}: {str(e)}")
@@ -220,17 +234,18 @@ def check_crossovers():
     MA_LENGTH = 50
     IST = pytz.timezone('Asia/Kolkata')
     
-    # Timeframe settings
+    # Timeframe settings - EXTENDED LOOKBACK PERIODS
     timeframes = {
-        '1d': {'label': 'DAILY', 'lookback_days': 7, 'display_days': 30},
-        '1wk': {'label': 'WEEKLY', 'lookback_days': 14, 'display_days': 52},  # ~1 year of weekly data
-        '1mo': {'label': 'MONTHLY', 'lookback_days': 30, 'display_days': 24}   # 2 years of monthly data
+        '1d': {'label': 'DAILY', 'lookback_days': 14, 'display_days': 30},  # Extended from 7 to 14
+        '1wk': {'label': 'WEEKLY', 'lookback_days': 28, 'display_days': 52},  # Extended from 14 to 28
+        '1mo': {'label': 'MONTHLY', 'lookback_days': 90, 'display_days': 24}   # Extended from 30 to 90
     }
     
-    print(f"Running scan at {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Running scan at {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Load NSE500 stocks
     stock_list = load_nse500_stocks()
+    logger.info(f"Processing {len(stock_list)} stocks")
     
     # Track how many alerts we've sent
     alerts_sent = 0
@@ -243,10 +258,22 @@ def check_crossovers():
         'MONTHLY_BUY': 0, 'MONTHLY_SELL': 0
     }
     
+    # Add counters for total stocks processed
+    stocks_processed = 0
+    stocks_with_data = 0
+    
+    # Send initial status message
+    send_telegram_message(f"🔍 *MARS Scan Started*\nProcessing {len(stock_list)} stocks across 3 timeframes...")
+    
     for stock in stock_list:
         # Stop if we've sent too many alerts
         if alerts_sent >= max_alerts:
+            logger.info(f"Reached maximum alerts limit ({max_alerts})")
             break
+            
+        stocks_processed += 1
+        if stocks_processed % 10 == 0:
+            logger.info(f"Processed {stocks_processed}/{len(stock_list)} stocks")
             
         for timeframe, settings in timeframes.items():
             try:
@@ -261,6 +288,8 @@ def check_crossovers():
                 
                 if result is None:
                     continue
+                
+                stocks_with_data += 1
                     
                 # Check for recent crossovers based on timeframe
                 latest_idx = result['mars_value'].index[-1]
@@ -270,20 +299,25 @@ def check_crossovers():
                 if timeframe == '1d':
                     lookback_date = latest_idx - timedelta(days=lookback_days)
                 elif timeframe == '1wk':
-                    # Look back a certain number of weeks
-                    # This is an approximation since we're working with DatetimeIndex
                     lookback_date = latest_idx - timedelta(days=lookback_days)
                 else:  # monthly
-                    # Look back a certain number of months
                     lookback_date = latest_idx - timedelta(days=lookback_days)
                 
                 # Get data from lookback date to now
                 filtered_data = result['mars_value'].loc[lookback_date:]
                 if filtered_data.empty:
+                    logger.warning(f"No filtered data for {stock} on {timeframe} within lookback period")
                     continue
                 
+                # Get crossover information
                 recent_crossover_up = result['crossover_up'].loc[lookback_date:].any()
                 recent_crossover_down = result['crossover_down'].loc[lookback_date:].any()
+                
+                # Count crossovers for debugging
+                num_up = result['crossover_up'].loc[lookback_date:].sum()
+                num_down = result['crossover_down'].loc[lookback_date:].sum()
+                
+                logger.info(f"{stock} {timeframe}: Up crossovers: {num_up}, Down crossovers: {num_down}")
                 
                 if recent_crossover_up or recent_crossover_down:
                     # Generate chart
@@ -352,6 +386,7 @@ def check_crossovers():
     
     # Send summary message
     summary = f"🔍 *MARS Scan Complete*\n\n"
+    summary += f"Processed {stocks_processed} stocks, {stocks_with_data} had valid data\n\n"
     summary += "📊 *BUY Signals:*\n"
     summary += f"🟢 DAILY: {alert_counts['DAILY_BUY']}\n"
     summary += f"🟢 WEEKLY: {alert_counts['WEEKLY_BUY']}\n"
@@ -361,6 +396,15 @@ def check_crossovers():
     summary += f"🔴 WEEKLY: {alert_counts['WEEKLY_SELL']}\n"
     summary += f"🔴 MONTHLY: {alert_counts['MONTHLY_SELL']}\n\n"
     summary += f"Total: {alerts_sent} alerts among {len(stock_list)} stocks"
+    
+    # Send status message only if we found no alerts at all
+    if alerts_sent == 0:
+        status_msg = "No crossovers detected in any timeframe. This could be because:\n"
+        status_msg += "1. Market is stable with no significant crossovers\n"
+        status_msg += "2. Lookback period might be too short\n"
+        status_msg += "3. There might be data availability issues\n\n"
+        status_msg += "Consider adjusting the lookback periods or checking the data quality."
+        summary += "\n\n" + status_msg
     
     send_telegram_message(summary)
     
