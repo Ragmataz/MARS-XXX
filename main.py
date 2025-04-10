@@ -226,10 +226,11 @@ def check_crossovers():
                 
             # Check for recent crossovers (last 2 days to catch weekend crossovers)
             latest_idx = result['mars_value'].index[-1]
-            two_days_ago = latest_idx - timedelta(days=2)
+            lookback_days = 7  # Check for crossovers in the last week instead of 2 days
+lookback_date = latest_idx - timedelta(days=lookback_days)
             
-            recent_crossover_up = result['crossover_up'].loc[two_days_ago:].any()
-            recent_crossover_down = result['crossover_down'].loc[two_days_ago:].any()
+            recent_crossover_up = result['crossover_up'].loc[lookback_date:].any()
+recent_crossover_down = result['crossover_down'].loc[lookback_date:].any()
             
             if recent_crossover_up or recent_crossover_down:
                 # Generate chart
