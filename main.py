@@ -14,7 +14,7 @@ import requests
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Telegram setup - the key issue is likely here
+# Telegram setup
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
@@ -108,15 +108,28 @@ def calculate_ma(data, length, ma_type='EMA'):
         weights = np.arange(1, length + 1)
         return data.rolling(window=length).apply(lambda x: np.sum(weights * x) / weights.sum(), raw=True)
 
-def calculate_mars(stock_symbol, index_symbol, ma_length, ma_type, days=100):
-    """Calculate MARS indicator and detect crossovers."""
+def calculate_mars(stock_symbol, index_symbol, ma_length, ma_type, timeframe='1d', days=100):
+    """Calculate MARS indicator and detect crossovers for different timeframes."""
     try:
+        # Adjust interval and period based on timeframe
+        if timeframe == '1d':
+            interval = '1d'
+            lookback_days = days
+        elif timeframe == '1wk':
+            interval = '1wk'
+            lookback_days = days * 7  # Need more historical data for weekly
+        elif timeframe == '1mo':
+            interval = '1mo'
+            lookback_days = days * 30  # Need more historical data for monthly
+        else:
+            raise ValueError(f"Unsupported timeframe: {timeframe}")
+        
         # Get data
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=days+ma_length)  # Extra days for MA calculation
+        start_date = end_date - timedelta(days=lookback_days+ma_length*2)  # Extra days for MA calculation
         
-        stock_data = yf.download(stock_symbol, start=start_date, end=end_date, progress=False)
-        index_data = yf.download(index_symbol, start=start_date, end=end_date, progress=False)
+        stock_data = yf.download(stock_symbol, start=start_date, end=end_date, interval=interval, progress=False)
+        index_data = yf.download(index_symbol, start=start_date, end=end_date, interval=interval, progress=False)
         
         if stock_data.empty or index_data.empty:
             return None
@@ -148,10 +161,10 @@ def calculate_mars(stock_symbol, index_symbol, ma_length, ma_type, days=100):
             'latest_mars': mars_value.iloc[-1] if not mars_value.empty else None
         }
     except Exception as e:
-        logger.error(f"Error calculating MARS for {stock_symbol}: {str(e)}")
+        logger.error(f"Error calculating MARS for {stock_symbol} on {timeframe}: {str(e)}")
         return None
 
-def generate_chart(stock_symbol, result, days_to_show=30, ma_type='EMA', ma_length=50):
+def generate_chart(stock_symbol, result, timeframe='1d', days_to_show=30, ma_type='EMA', ma_length=50):
     """Generate chart with stock price and MARS indicator."""
     try:
         # Create a figure
@@ -168,14 +181,17 @@ def generate_chart(stock_symbol, result, days_to_show=30, ma_type='EMA', ma_leng
         ax1.plot(stock_data.index, stock_data['Close'], label='Close Price')
         ax1.plot(stock_data.index, result['stock_ma'].iloc[start_idx:end_idx], label=f'{ma_type} {ma_length}')
         stock_name = stock_symbol.replace('.NS', '')
-        ax1.set_title(f'{stock_name} Stock Price')
+        
+        # Set title based on timeframe
+        timeframe_label = "Daily" if timeframe == '1d' else "Weekly" if timeframe == '1wk' else "Monthly"
+        ax1.set_title(f'{stock_name} {timeframe_label} Chart')
         ax1.legend()
         ax1.grid(True)
         
         # Plot MARS indicator
         ax2.plot(mars_data.index, mars_data, color='blue', label='MARS')
         ax2.axhline(y=0, color='r', linestyle='-', alpha=0.3)
-        ax2.set_title('MARS Indicator')
+        ax2.set_title(f'MARS Indicator ({timeframe_label})')
         ax2.legend()
         ax2.grid(True)
         
@@ -187,22 +203,29 @@ def generate_chart(stock_symbol, result, days_to_show=30, ma_type='EMA', ma_leng
         plt.tight_layout()
         
         # Save chart
-        filename = f'charts/{stock_symbol.replace(".", "_")}_MARS_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        filename = f'charts/{stock_symbol.replace(".", "_")}_MARS_{timeframe}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
         plt.savefig(filename)
         plt.close()
         
         return filename
     except Exception as e:
-        logger.error(f"Error generating chart for {stock_symbol}: {str(e)}")
+        logger.error(f"Error generating chart for {stock_symbol} on {timeframe}: {str(e)}")
         return None
 
 def check_crossovers():
-    """Check for MARS crossovers in all NSE500 stocks."""
+    """Check for MARS crossovers in all NSE500 stocks across different timeframes."""
     # Configuration
     INDEX = '^NSEI'  # NIFTY 50
     MA_TYPE = 'EMA'  # SMA, EMA, WMA
     MA_LENGTH = 50
     IST = pytz.timezone('Asia/Kolkata')
+    
+    # Timeframe settings
+    timeframes = {
+        '1d': {'label': 'DAILY', 'lookback_days': 7, 'display_days': 30},
+        '1wk': {'label': 'WEEKLY', 'lookback_days': 14, 'display_days': 52},  # ~1 year of weekly data
+        '1mo': {'label': 'MONTHLY', 'lookback_days': 30, 'display_days': 24}   # 2 years of monthly data
+    }
     
     print(f"Running scan at {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')}")
     
@@ -211,73 +234,134 @@ def check_crossovers():
     
     # Track how many alerts we've sent
     alerts_sent = 0
-    max_alerts = 10  # Limit number of alerts to avoid flooding
+    max_alerts = 30  # Increased limit to accommodate more timeframes
+    
+    # Track alerts by category for summary
+    alert_counts = {
+        'DAILY_BUY': 0, 'DAILY_SELL': 0,
+        'WEEKLY_BUY': 0, 'WEEKLY_SELL': 0,
+        'MONTHLY_BUY': 0, 'MONTHLY_SELL': 0
+    }
     
     for stock in stock_list:
         # Stop if we've sent too many alerts
         if alerts_sent >= max_alerts:
             break
             
-        try:
-            result = calculate_mars(stock, INDEX, MA_LENGTH, MA_TYPE)
-            
-            if result is None:
-                continue
+        for timeframe, settings in timeframes.items():
+            try:
+                result = calculate_mars(
+                    stock, 
+                    INDEX, 
+                    MA_LENGTH, 
+                    MA_TYPE, 
+                    timeframe=timeframe, 
+                    days=100 if timeframe == '1d' else 200 if timeframe == '1wk' else 365
+                )
                 
-            # Check for recent crossovers (last 2 days to catch weekend crossovers)
-            latest_idx = result['mars_value'].index[-1]
-            lookback_days = 7  # Check for crossovers in the last week instead of 2 days
-            lookback_date = latest_idx - timedelta(days=lookback_days)
-            
-            recent_crossover_up = result['crossover_up'].loc[lookback_date:].any()
-            recent_crossover_down = result['crossover_down'].loc[lookback_date:].any()
-            
-            if recent_crossover_up or recent_crossover_down:
-                # Generate chart
-                chart_path = generate_chart(stock, result, ma_type=MA_TYPE, ma_length=MA_LENGTH)
+                if result is None:
+                    continue
+                    
+                # Check for recent crossovers based on timeframe
+                latest_idx = result['mars_value'].index[-1]
+                lookback_days = settings['lookback_days']
                 
-                if chart_path is None:
+                # For weekly and monthly, we need to look at the index differently
+                if timeframe == '1d':
+                    lookback_date = latest_idx - timedelta(days=lookback_days)
+                elif timeframe == '1wk':
+                    # Look back a certain number of weeks
+                    # This is an approximation since we're working with DatetimeIndex
+                    lookback_date = latest_idx - timedelta(days=lookback_days)
+                else:  # monthly
+                    # Look back a certain number of months
+                    lookback_date = latest_idx - timedelta(days=lookback_days)
+                
+                # Get data from lookback date to now
+                filtered_data = result['mars_value'].loc[lookback_date:]
+                if filtered_data.empty:
                     continue
                 
-                # Prepare message with emojis
-                stock_name = stock.replace('.NS', '')
-                crossover_type = "UP 🚀" if recent_crossover_up else "DOWN 📉"
-                current_mars = result['latest_mars']
+                recent_crossover_up = result['crossover_up'].loc[lookback_date:].any()
+                recent_crossover_down = result['crossover_down'].loc[lookback_date:].any()
                 
-                message = f"🔔 *MARS CROSSOVER {crossover_type}*: {stock_name}\n\n"
-                message += f"📊 Current MARS Value: {current_mars:.2f}\n"
-                message += f"📅 Date: {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')}\n"
-                message += f"📈 MA Type: {MA_TYPE}, Length: {MA_LENGTH}\n\n"
-                
-                # Add trend strength indicator
-                if recent_crossover_up:
-                    if current_mars > 5:
-                        message += "💪 Strong Bullish Signal"
+                if recent_crossover_up or recent_crossover_down:
+                    # Generate chart
+                    chart_path = generate_chart(
+                        stock, 
+                        result, 
+                        timeframe=timeframe,
+                        days_to_show=settings['display_days'], 
+                        ma_type=MA_TYPE, 
+                        ma_length=MA_LENGTH
+                    )
+                    
+                    if chart_path is None:
+                        continue
+                    
+                    # Prepare message with emojis
+                    stock_name = stock.replace('.NS', '')
+                    timeframe_label = settings['label']
+                    
+                    if recent_crossover_up:
+                        # BUY signal with green button emoji
+                        crossover_type = "BUY"
+                        emoji_prefix = "🟢"  # Green button
+                        category = f"{timeframe_label}_BUY"
+                        alert_counts[category] += 1
                     else:
-                        message += "👍 Bullish Signal"
-                else:
-                    if current_mars < -5:
-                        message += "💪 Strong Bearish Signal"
+                        # SELL signal with red button emoji
+                        crossover_type = "SELL"
+                        emoji_prefix = "🔴"  # Red button
+                        category = f"{timeframe_label}_SELL"
+                        alert_counts[category] += 1
+                    
+                    current_mars = result['latest_mars']
+                    
+                    message = f"{emoji_prefix} *MARS {timeframe_label} {crossover_type}*: {stock_name}\n\n"
+                    message += f"📊 Current MARS Value: {current_mars:.2f}\n"
+                    message += f"📅 Date: {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    message += f"📈 MA Type: {MA_TYPE}, Length: {MA_LENGTH}\n\n"
+                    
+                    # Add trend strength indicator
+                    if recent_crossover_up:
+                        if current_mars > 5:
+                            message += "💪 Strong Bullish Signal"
+                        else:
+                            message += "👍 Bullish Signal"
                     else:
-                        message += "👎 Bearish Signal"
+                        if current_mars < -5:
+                            message += "💪 Strong Bearish Signal"
+                        else:
+                            message += "👎 Bearish Signal"
+                    
+                    # Send to Telegram
+                    success = send_telegram_message(message, chart_path)
+                    
+                    if success:
+                        logger.info(f"Alert sent for {stock}: MARS {timeframe_label} {crossover_type}")
+                        alerts_sent += 1
+                    else:
+                        logger.warning(f"Failed to send alert for {stock}")
+                    
+                    # Remove chart file to save space
+                    os.remove(chart_path)
                 
-                # Send to Telegram
-                success = send_telegram_message(message, chart_path)
-                
-                if success:
-                    logger.info(f"Alert sent for {stock}: MARS CROSSOVER {crossover_type}")
-                    alerts_sent += 1
-                else:
-                    logger.warning(f"Failed to send alert for {stock}")
-                
-                # Remove chart file to save space
-                os.remove(chart_path)
-            
-        except Exception as e:
-            logger.error(f"Error processing {stock}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error processing {stock} on {timeframe}: {str(e)}")
     
     # Send summary message
-    summary = f"🔍 *MARS Scan Complete*\n📊 {alerts_sent} crossovers detected among {len(stock_list)} stocks"
+    summary = f"🔍 *MARS Scan Complete*\n\n"
+    summary += "📊 *BUY Signals:*\n"
+    summary += f"🟢 DAILY: {alert_counts['DAILY_BUY']}\n"
+    summary += f"🟢 WEEKLY: {alert_counts['WEEKLY_BUY']}\n"
+    summary += f"🟢 MONTHLY: {alert_counts['MONTHLY_BUY']}\n\n"
+    summary += "📊 *SELL Signals:*\n"
+    summary += f"🔴 DAILY: {alert_counts['DAILY_SELL']}\n"
+    summary += f"🔴 WEEKLY: {alert_counts['WEEKLY_SELL']}\n"
+    summary += f"🔴 MONTHLY: {alert_counts['MONTHLY_SELL']}\n\n"
+    summary += f"Total: {alerts_sent} alerts among {len(stock_list)} stocks"
+    
     send_telegram_message(summary)
     
     return alerts_sent
