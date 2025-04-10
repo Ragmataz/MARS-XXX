@@ -155,10 +155,14 @@ def calculate_mars(stock_symbol, index_symbol, ma_length, ma_type, timeframe='1d
         # Calculate MARS value
         mars_value = stock_percent - index_percent
         
-        # Detect crossovers
+        # MODIFIED: Enhanced crossover detection
         previous_mars = mars_value.shift(1)
-        crossover_up = (previous_mars < 0) & (mars_value > 0)
-        crossover_down = (previous_mars > 0) & (mars_value < 0)
+        
+        # Buy signal: previously below 0 and now between 0 and 4
+        crossover_up = (previous_mars < 0) & (mars_value >= 0) & (mars_value <= 4)
+        
+        # Sell signal: previously above 0 and now between 0 and -3
+        crossover_down = (previous_mars > 0) & (mars_value <= 0) & (mars_value >= -3)
         
         # Log the latest MARS value
         latest_mars = mars_value.iloc[-1] if not mars_value.empty else None
@@ -205,6 +209,11 @@ def generate_chart(stock_symbol, result, timeframe='1d', days_to_show=30, ma_typ
         # Plot MARS indicator
         ax2.plot(mars_data.index, mars_data, color='blue', label='MARS')
         ax2.axhline(y=0, color='r', linestyle='-', alpha=0.3)
+        
+        # MODIFIED: Add horizontal lines at +4 and -3 to show the signal zones
+        ax2.axhline(y=4, color='g', linestyle='--', alpha=0.3, label='Buy Zone Limit')
+        ax2.axhline(y=-3, color='r', linestyle='--', alpha=0.3, label='Sell Zone Limit')
+        
         ax2.set_title(f'MARS Indicator ({timeframe_label})')
         ax2.legend()
         ax2.grid(True)
@@ -317,6 +326,26 @@ def check_crossovers():
                 recent_crossover_up = result['crossover_up'].loc[lookback_date:].any()
                 recent_crossover_down = result['crossover_down'].loc[lookback_date:].any()
                 
+                # MODIFIED: Capture current values
+                current_mars = result['latest_mars']
+                
+                # MODIFIED: Additional check for MARS value in the desired range
+                if not recent_crossover_up and not recent_crossover_down:
+                    # Check if current MARS value is in our target ranges (0 to 4 or 0 to -3)
+                    # and if previous value was on the other side of zero
+                    previous_value = result['mars_value'].iloc[-2] if len(result['mars_value']) > 1 else None
+                    
+                    if previous_value is not None:
+                        # Check for potential buy signal (0 to 4 range)
+                        if 0 <= current_mars <= 4 and previous_value < 0:
+                            recent_crossover_up = True
+                            logger.info(f"{stock} {timeframe}: Manual buy detection - current: {current_mars:.2f}, previous: {previous_value:.2f}")
+                        
+                        # Check for potential sell signal (0 to -3 range)
+                        elif -3 <= current_mars <= 0 and previous_value > 0:
+                            recent_crossover_down = True
+                            logger.info(f"{stock} {timeframe}: Manual sell detection - current: {current_mars:.2f}, previous: {previous_value:.2f}")
+                
                 # Count crossovers for debugging
                 num_up = result['crossover_up'].loc[lookback_date:].sum()
                 num_down = result['crossover_down'].loc[lookback_date:].sum()
@@ -354,24 +383,22 @@ def check_crossovers():
                         category = f"{timeframe_label}_SELL"
                         alert_counts[category] += 1
                     
-                    current_mars = result['latest_mars']
-                    
                     message = f"{emoji_prefix} *MARS {timeframe_label} {crossover_type}*: {stock_name}\n\n"
                     message += f"📊 Current MARS Value: {current_mars:.2f}\n"
                     message += f"📅 Date: {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')}\n"
                     message += f"📈 MA Type: {MA_TYPE}, Length: {MA_LENGTH}\n\n"
                     
-                    # Add trend strength indicator
+                    # Add trend strength indicator with additional context about the new zone-based approach
                     if recent_crossover_up:
-                        if current_mars > 5:
-                            message += "💪 Strong Bullish Signal"
+                        if current_mars > 2:
+                            message += "💪 Strong Bullish Signal (In Buy Zone 0 to +4)"
                         else:
-                            message += "👍 Bullish Signal"
+                            message += "👍 Bullish Signal (In Buy Zone 0 to +4)"
                     else:
-                        if current_mars < -5:
-                            message += "💪 Strong Bearish Signal"
+                        if current_mars < -1.5:
+                            message += "💪 Strong Bearish Signal (In Sell Zone 0 to -3)"
                         else:
-                            message += "👎 Bearish Signal"
+                            message += "👎 Bearish Signal (In Sell Zone 0 to -3)"
                     
                     # Send to Telegram
                     success = send_telegram_message(message, chart_path)
