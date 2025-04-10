@@ -1,5 +1,4 @@
 Symbol,Sector
-# Energy & Oil and Gas
 RELIANCE,Energy
 ONGC,Oil & Gas
 ADANIENT,Energy
@@ -15,8 +14,6 @@ NTPC,Power
 POWERGRID,Power
 TORNTPOWER,Power
 CESC,Power
-
-# Information Technology
 TCS,IT
 INFY,IT
 WIPRO,IT
@@ -29,8 +26,6 @@ COFORGE,IT
 LTTS,IT
 LTI,IT
 OFSS,IT
-
-# Banking and Financial Services
 HDFCBANK,Banking
 ICICIBANK,Banking
 SBIN,Banking
@@ -55,15 +50,11 @@ L&TFH,Financial Services
 CHOLAFIN,Financial Services
 LICHSGFIN,Financial Services
 MANAPPURAM,Financial Services
-
-# Insurance
 HDFCLIFE,Insurance
 SBILIFE,Insurance
 ICICIPRULI,Insurance
 GICRE,Insurance
 NIACL,Insurance
-
-# Consumer Goods
 HINDUNILVR,FMCG
 ITC,FMCG
 BRITANNIA,FMCG
@@ -78,8 +69,6 @@ PGHH,FMCG
 GODREJIND,FMCG
 VBL,FMCG
 EMAMILTD,FMCG
-
-# Pharmaceuticals & Healthcare
 SUNPHARMA,Pharma
 DIVISLAB,Pharma
 DRREDDY,Pharma
@@ -99,8 +88,6 @@ SYNGENE,Pharma
 LALPATHLAB,Healthcare
 FORTIS,Healthcare
 APOLLOHOSP,Healthcare
-
-# Automobile & Auto Components
 TATAMOTORS,Automobiles
 MARUTI,Automobiles
 M&M,Automobiles
@@ -116,8 +103,6 @@ ENDURANCE,Auto Components
 MRF,Auto Components
 CUMMINSIND,Auto Components
 ESCORTS,Auto Components
-
-# Metals & Mining
 JSWSTEEL,Metal & Mining
 TATASTEEL,Metal & Mining
 HINDALCO,Metal & Mining
@@ -126,12 +111,8 @@ SAIL,Metal & Mining
 NMDC,Metal & Mining
 NATIONALUM,Metal & Mining
 JINDALSTEL,Metal & Mining
-
-# Telecommunication
 BHARTIARTL,Telecom
 IDEA,Telecom
-
-# Cement & Construction
 ULTRACEMCO,Cement
 SHREECEM,Cement
 AMBUJACEM,Cement
@@ -143,8 +124,6 @@ DLF,Real Estate
 GODREJPROP,Real Estate
 GMRINFRA,Infrastructure
 CONCOR,Transportation
-
-# Chemicals & Fertilizers
 UPL,Chemicals
 PIIND,Chemicals
 SRF,Chemicals
@@ -153,8 +132,6 @@ BAYERCROP,Chemicals
 SUMICHEM,Chemicals
 DEEPAKNTR,Chemicals
 NAVINFLUOR,Chemicals
-
-# Consumer Discretionary
 TITAN,Consumer Discretionary
 JUBLFOOD,Consumer Discretionary
 BATAINDIA,Consumer Discretionary
@@ -166,8 +143,6 @@ PAGEIND,Textiles
 RELAXO,Footwear
 CROMPTON,Consumer Durables
 WHIRLPOOL,Consumer Durables
-
-# Others
 ADANIPORTS,Ports
 INDIGO,Aviation
 NAUKRI,Internet
