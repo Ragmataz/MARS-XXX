@@ -155,15 +155,6 @@ def calculate_mars(stock_symbol, index_symbol, ma_length, ma_type, timeframe='1d
         # Calculate MARS value
         mars_value = stock_percent - index_percent
         
-        # MODIFIED: Enhanced crossover detection
-        previous_mars = mars_value.shift(1)
-        
-        # Buy signal: previously below 0 and now between 0 and 4
-        crossover_up = (previous_mars < 0) & (mars_value >= 0) & (mars_value <= 4)
-        
-        # Sell signal: previously above 0 and now between 0 and -3
-        crossover_down = (previous_mars > 0) & (mars_value <= 0) & (mars_value >= -3)
-        
         # Log the latest MARS value
         latest_mars = mars_value.iloc[-1] if not mars_value.empty else None
         logger.info(f"{stock_symbol} {timeframe} latest MARS value: {latest_mars}")
@@ -172,8 +163,6 @@ def calculate_mars(stock_symbol, index_symbol, ma_length, ma_type, timeframe='1d
             'stock_data': stock_data,
             'index_data': index_data,
             'mars_value': mars_value,
-            'crossover_up': crossover_up,
-            'crossover_down': crossover_down,
             'stock_ma': stock_ma,
             'index_ma': index_ma,
             'latest_mars': latest_mars
@@ -210,7 +199,7 @@ def generate_chart(stock_symbol, result, timeframe='1d', days_to_show=30, ma_typ
         ax2.plot(mars_data.index, mars_data, color='blue', label='MARS')
         ax2.axhline(y=0, color='r', linestyle='-', alpha=0.3)
         
-        # MODIFIED: Add horizontal lines at +4 and -3 to show the signal zones
+        # Add horizontal lines at +4 and -3 to show the signal zones
         ax2.axhline(y=4, color='g', linestyle='--', alpha=0.3, label='Buy Zone Limit')
         ax2.axhline(y=-3, color='r', linestyle='--', alpha=0.3, label='Sell Zone Limit')
         
@@ -234,6 +223,43 @@ def generate_chart(stock_symbol, result, timeframe='1d', days_to_show=30, ma_typ
     except Exception as e:
         logger.error(f"Error generating chart for {stock_symbol} on {timeframe}: {str(e)}")
         return None
+
+def check_crossovers_in_recent_candles(mars_data, num_candles=2):
+    """
+    Check if there was a crossover in the most recent num_candles.
+    Returns a tuple (buy_signal, sell_signal, signal_candle_index)
+    """
+    if len(mars_data) < num_candles + 1:
+        return False, False, None
+    
+    # Get the most recent candles plus one before to check crossover
+    recent_data = mars_data.iloc[-(num_candles+1):]
+    
+    buy_signal = False
+    sell_signal = False
+    signal_candle_index = None
+    
+    # Check each of the last num_candles candles for crossovers
+    for i in range(1, num_candles + 1):
+        if i >= len(recent_data):
+            break
+            
+        current_value = recent_data.iloc[-i]
+        previous_value = recent_data.iloc[-(i+1)]
+        
+        # Buy signal: previously below 0 and now between 0 and 4
+        if previous_value < 0 and 0 <= current_value <= 4:
+            buy_signal = True
+            signal_candle_index = len(mars_data) - i
+            break
+            
+        # Sell signal: previously above 0 and now between 0 and -3
+        elif previous_value > 0 and -3 <= current_value <= 0:
+            sell_signal = True
+            signal_candle_index = len(mars_data) - i
+            break
+    
+    return buy_signal, sell_signal, signal_candle_index
 
 def check_crossovers():
     """Check for MARS crossovers in all NSE500 stocks across different timeframes."""
@@ -275,8 +301,18 @@ def check_crossovers():
     stocks_processed = 0
     stocks_with_data = 0
     
+    # Debug counters
+    in_buy_zone_count = 0
+    in_sell_zone_count = 0
+    
     # Send initial status message
     send_telegram_message(f"🔍 *MARS Scan Started*\nProcessing {len(stock_list)} stocks across 3 timeframes...")
+    
+    # Store stocks for debugging
+    stocks_in_zones = {
+        'buy_zone': [],
+        'sell_zone': []
+    }
     
     for stock in stock_list:
         # Stop if we've sent too many alerts
@@ -322,37 +358,25 @@ def check_crossovers():
                     logger.warning(f"No filtered data for {stock} on {timeframe} within lookback period")
                     continue
                 
-                # Get crossover information
-                recent_crossover_up = result['crossover_up'].loc[lookback_date:].any()
-                recent_crossover_down = result['crossover_down'].loc[lookback_date:].any()
-                
-                # MODIFIED: Capture current values
+                # Get the latest MARS value
                 current_mars = result['latest_mars']
                 
-                # MODIFIED: Additional check for MARS value in the desired range
-                if not recent_crossover_up and not recent_crossover_down:
-                    # Check if current MARS value is in our target ranges (0 to 4 or 0 to -3)
-                    # and if previous value was on the other side of zero
-                    previous_value = result['mars_value'].iloc[-2] if len(result['mars_value']) > 1 else None
+                # NEW: Check for crossovers in the last 2 candles
+                buy_signal, sell_signal, signal_idx = check_crossovers_in_recent_candles(
+                    result['mars_value'], num_candles=2
+                )
+                
+                # Additional debug information
+                if 0 <= current_mars <= 4:
+                    in_buy_zone_count += 1
+                    stocks_in_zones['buy_zone'].append(f"{stock} ({timeframe}): {current_mars:.2f}")
+                elif -3 <= current_mars <= 0:
+                    in_sell_zone_count += 1
+                    stocks_in_zones['sell_zone'].append(f"{stock} ({timeframe}): {current_mars:.2f}")
+                
+                if buy_signal or sell_signal:
+                    logger.info(f"Signal detected for {stock} on {timeframe}: Buy={buy_signal}, Sell={sell_signal}")
                     
-                    if previous_value is not None:
-                        # Check for potential buy signal (0 to 4 range)
-                        if 0 <= current_mars <= 4 and previous_value < 0:
-                            recent_crossover_up = True
-                            logger.info(f"{stock} {timeframe}: Manual buy detection - current: {current_mars:.2f}, previous: {previous_value:.2f}")
-                        
-                        # Check for potential sell signal (0 to -3 range)
-                        elif -3 <= current_mars <= 0 and previous_value > 0:
-                            recent_crossover_down = True
-                            logger.info(f"{stock} {timeframe}: Manual sell detection - current: {current_mars:.2f}, previous: {previous_value:.2f}")
-                
-                # Count crossovers for debugging
-                num_up = result['crossover_up'].loc[lookback_date:].sum()
-                num_down = result['crossover_down'].loc[lookback_date:].sum()
-                
-                logger.info(f"{stock} {timeframe}: Up crossovers: {num_up}, Down crossovers: {num_down}")
-                
-                if recent_crossover_up or recent_crossover_down:
                     # Generate chart
                     chart_path = generate_chart(
                         stock, 
@@ -370,14 +394,12 @@ def check_crossovers():
                     stock_name = stock.replace('.NS', '')
                     timeframe_label = settings['label']
                     
-                    if recent_crossover_up:
-                        # BUY signal with green emoji
+                    if buy_signal:
                         crossover_type = "BUY"
                         emoji_prefix = BUY_EMOJI
                         category = f"{timeframe_label}_BUY"
                         alert_counts[category] += 1
                     else:
-                        # SELL signal with red emoji
                         crossover_type = "SELL"
                         emoji_prefix = SELL_EMOJI
                         category = f"{timeframe_label}_SELL"
@@ -388,8 +410,8 @@ def check_crossovers():
                     message += f"📅 Date: {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')}\n"
                     message += f"📈 MA Type: {MA_TYPE}, Length: {MA_LENGTH}\n\n"
                     
-                    # Add trend strength indicator with additional context about the new zone-based approach
-                    if recent_crossover_up:
+                    # Add trend strength indicator
+                    if buy_signal:
                         if current_mars > 2:
                             message += "💪 Strong Bullish Signal (In Buy Zone 0 to +4)"
                         else:
@@ -415,6 +437,15 @@ def check_crossovers():
             except Exception as e:
                 logger.error(f"Error processing {stock} on {timeframe}: {str(e)}")
     
+    # Debug logging for stocks in zones
+    logger.info(f"Total stocks in buy zone (0 to +4): {in_buy_zone_count}")
+    logger.info(f"Total stocks in sell zone (0 to -3): {in_sell_zone_count}")
+    
+    if in_buy_zone_count > 0:
+        logger.info(f"Sample stocks in buy zone: {', '.join(stocks_in_zones['buy_zone'][:5])}")
+    if in_sell_zone_count > 0:
+        logger.info(f"Sample stocks in sell zone: {', '.join(stocks_in_zones['sell_zone'][:5])}")
+    
     # Send summary message
     summary = f"🔍 *MARS Scan Complete*\n\n"
     summary += f"Processed {stocks_processed} stocks, {stocks_with_data} had valid data\n\n"
@@ -428,14 +459,22 @@ def check_crossovers():
     summary += f"{SELL_EMOJI} MONTHLY: {alert_counts['MONTHLY_SELL']}\n\n"
     summary += f"Total: {alerts_sent} alerts among {len(stock_list)} stocks"
     
-    # Send status message only if we found no alerts at all
+    # Send extended debug information if no alerts were found
     if alerts_sent == 0:
-        status_msg = "No crossovers detected in any timeframe. This could be because:\n"
-        status_msg += "1. Market is stable with no significant crossovers\n"
-        status_msg += "2. Lookback period might be too short\n"
-        status_msg += "3. There might be data availability issues\n\n"
-        status_msg += "Consider adjusting the lookback periods or checking the data quality."
-        summary += "\n\n" + status_msg
+        debug_info = "\n\n📊 *Debug Information:*\n"
+        debug_info += f"- Stocks in Buy Zone (0 to +4): {in_buy_zone_count}\n"
+        debug_info += f"- Stocks in Sell Zone (0 to -3): {in_sell_zone_count}\n\n"
+        
+        if in_buy_zone_count > 0 or in_sell_zone_count > 0:
+            debug_info += "Some stocks are in signal zones but didn't meet the crossover criteria.\n"
+            debug_info += "Consider using a broader detection approach if you want to include these stocks."
+        else:
+            debug_info += "No stocks found in any signal zones. This could be because:\n"
+            debug_info += "1. Market is stable with no significant moves\n"
+            debug_info += "2. Lookback period might be too short\n"
+            debug_info += "3. There might be data availability issues"
+            
+        summary += debug_info
     
     send_telegram_message(summary)
     
