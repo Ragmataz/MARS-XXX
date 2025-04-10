@@ -1,16 +1,182 @@
-Symbol
-RELIANCE
-TCS
-INFY
-HDFCBANK
-ICICIBANK
-HINDUNILVR
-SBIN
-BHARTIARTL
-HDFC
-ITC
-KOTAKBANK
-ASIANPAINT
-MARUTI
-AXISBANK
-LT
+Symbol,Sector
+# Energy & Oil and Gas
+RELIANCE,Energy
+ONGC,Oil & Gas
+ADANIENT,Energy
+BPCL,Oil & Gas
+IOC,Oil & Gas
+GAIL,Oil & Gas
+ADANIPOWER,Energy
+VEDL,Metal & Mining
+HINDPETRO,Oil & Gas
+PETRONET,Oil & Gas
+TATAPOWER,Energy
+NTPC,Power
+POWERGRID,Power
+TORNTPOWER,Power
+CESC,Power
+
+# Information Technology
+TCS,IT
+INFY,IT
+WIPRO,IT
+HCLTECH,IT
+TECHM,IT
+MINDTREE,IT
+MPHASIS,IT
+PERSISTENT,IT
+COFORGE,IT
+LTTS,IT
+LTI,IT
+OFSS,IT
+
+# Banking and Financial Services
+HDFCBANK,Banking
+ICICIBANK,Banking
+SBIN,Banking
+AXISBANK,Banking
+KOTAKBANK,Banking
+INDUSINDBK,Banking
+BANKBARODA,Banking
+AUBANK,Banking
+BANDHANBNK,Banking
+FEDERALBNK,Banking
+PNB,Banking
+RBLBANK,Banking
+CANBK,Banking
+HDFC,Financial Services
+BAJFINANCE,Financial Services
+BAJAJFINSV,Financial Services
+MUTHOOTFIN,Financial Services
+PFC,Financial Services
+RECLTD,Financial Services
+SRTRANSFIN,Financial Services
+L&TFH,Financial Services
+CHOLAFIN,Financial Services
+LICHSGFIN,Financial Services
+MANAPPURAM,Financial Services
+
+# Insurance
+HDFCLIFE,Insurance
+SBILIFE,Insurance
+ICICIPRULI,Insurance
+GICRE,Insurance
+NIACL,Insurance
+
+# Consumer Goods
+HINDUNILVR,FMCG
+ITC,FMCG
+BRITANNIA,FMCG
+TATACONSUM,FMCG
+NESTLEIND,FMCG
+GODREJCP,FMCG
+DABUR,FMCG
+MARICO,FMCG
+COLPAL,FMCG
+UBL,FMCG
+PGHH,FMCG
+GODREJIND,FMCG
+VBL,FMCG
+EMAMILTD,FMCG
+
+# Pharmaceuticals & Healthcare
+SUNPHARMA,Pharma
+DIVISLAB,Pharma
+DRREDDY,Pharma
+CIPLA,Pharma
+BIOCON,Pharma
+LUPIN,Pharma
+TORNTPHARM,Pharma
+AUROPHARMA,Pharma
+CADILAHC,Pharma
+ALKEM,Pharma
+AJANTPHARM,Pharma
+NATCOPHARM,Pharma
+PFIZER,Pharma
+GLAXO,Pharma
+ABBOTINDIA,Pharma
+SYNGENE,Pharma
+LALPATHLAB,Healthcare
+FORTIS,Healthcare
+APOLLOHOSP,Healthcare
+
+# Automobile & Auto Components
+TATAMOTORS,Automobiles
+MARUTI,Automobiles
+M&M,Automobiles
+EICHERMOT,Automobiles
+HEROMOTOCO,Automobiles
+BAJAJ-AUTO,Automobiles
+TVSMOTOR,Automobiles
+MOTHERSUMI,Auto Components
+BOSCHLTD,Auto Components
+EXIDEIND,Auto Components
+BALKRISIND,Auto Components
+ENDURANCE,Auto Components
+MRF,Auto Components
+CUMMINSIND,Auto Components
+ESCORTS,Auto Components
+
+# Metals & Mining
+JSWSTEEL,Metal & Mining
+TATASTEEL,Metal & Mining
+HINDALCO,Metal & Mining
+COALINDIA,Metal & Mining
+SAIL,Metal & Mining
+NMDC,Metal & Mining
+NATIONALUM,Metal & Mining
+JINDALSTEL,Metal & Mining
+
+# Telecommunication
+BHARTIARTL,Telecom
+IDEA,Telecom
+
+# Cement & Construction
+ULTRACEMCO,Cement
+SHREECEM,Cement
+AMBUJACEM,Cement
+ACC,Cement
+RAMCOCEM,Cement
+GRASIM,Cement
+LT,Construction
+DLF,Real Estate
+GODREJPROP,Real Estate
+GMRINFRA,Infrastructure
+CONCOR,Transportation
+
+# Chemicals & Fertilizers
+UPL,Chemicals
+PIIND,Chemicals
+SRF,Chemicals
+AARTIIND,Chemicals
+BAYERCROP,Chemicals
+SUMICHEM,Chemicals
+DEEPAKNTR,Chemicals
+NAVINFLUOR,Chemicals
+
+# Consumer Discretionary
+TITAN,Consumer Discretionary
+JUBLFOOD,Consumer Discretionary
+BATAINDIA,Consumer Discretionary
+TRENT,Consumer Discretionary
+HAVELLS,Consumer Discretionary
+BERGEPAINT,Paints
+ASIANPAINT,Paints
+PAGEIND,Textiles
+RELAXO,Footwear
+CROMPTON,Consumer Durables
+WHIRLPOOL,Consumer Durables
+
+# Others
+ADANIPORTS,Ports
+INDIGO,Aviation
+NAUKRI,Internet
+SIEMENS,Industrial
+HAL,Defense
+BEL,Defense
+BHEL,Engineering
+CGPOWER,Engineering
+MCX,Exchange
+CRISIL,Ratings
+ZEEL,Media
+ABFRL,Retail
